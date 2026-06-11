@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4CAF50">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Task Manager</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; }
+table, th, td { border: 1px solid black; border-collapse: collapse; padding: 8px; }
+input { width: 95%; }
+button { margin: 2px; }
+</style>
+</head>
+<script>
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js")
+        .then(() => {
+            console.log("Service Worker Registered");
+        });
+}
+
+</script>
+<body>
+
+<h2>Student Task / Assignment Manager</h2>
+
+<table id="taskTable">
+    <tr>
+        <th>Task</th>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Status</th>
+        <th>Actions</th>
+    </tr>
+
+    <tr id="inputRow">
+        <td><input type="text" id="task" placeholder="Task"></td>
+        <td><input type="date" id="date"></td>
+        <td><input type="time" id="time"></td>
+        <td>Auto</td>
+        <td><button id="add">Add</button></td>
+    </tr>
+</table>
+
+<script>
+function getTasks() {
+    return JSON.parse(localStorage.getItem("tasks")) || [];
+}
+
+function saveTasks(tasks) {
+    localStorage.setItem("tasks", JSON.stringify(tasks));
+}
+
+function computeState(taskObj) {
+    if (taskObj.state === "Completed") return "Completed";
+
+    const due = new Date(`${taskObj.date}T${taskObj.time}`);
+    return due < new Date() ? "Overdue" : "Pending";
+}
+
+function renderTask(taskObj) {
+    const table = document.getElementById("taskTable");
+    const row = table.insertRow(table.rows.length - 1);
+
+    row.insertCell(0).textContent = taskObj.task;
+    row.insertCell(1).textContent = taskObj.date;
+    row.insertCell(2).textContent = taskObj.time;
+
+    const stateCell = row.insertCell(3);
+
+    const statusBtn = document.createElement("button");
+    statusBtn.textContent = computeState(taskObj);
+
+    statusBtn.addEventListener("click", () => {
+
+        if (taskObj.state === "Completed") {
+            const due = new Date(`${taskObj.date}T${taskObj.time}`);
+            taskObj.state = due < new Date() ? "Overdue" : "Pending";
+        }
+        else {
+            taskObj.state = "Completed";
+        }   
+
+        statusBtn.textContent = taskObj.state;
+
+        let tasks = getTasks();
+        const idx = tasks.findIndex(t => t.id === taskObj.id);
+
+        if (idx !== -1) {
+            tasks[idx].state = taskObj.state;
+            saveTasks(tasks);
+        }
+    });
+
+    stateCell.appendChild(statusBtn);
+
+    const actionCell = row.insertCell(4);
+
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "Edit";
+
+    editBtn.addEventListener("click", () => {
+
+    row.cells[0].innerHTML =
+        `<input type="text" value="${taskObj.task}">`;
+
+    row.cells[1].innerHTML =
+        `<input type="date" value="${taskObj.date}">`;
+
+    row.cells[2].innerHTML =
+        `<input type="time" value="${taskObj.time}">`;
+
+    editBtn.textContent = "Save";
+
+    editBtn.onclick = function() {
+
+        const newTask =
+            row.cells[0].querySelector("input").value;
+
+        const newDate =
+            row.cells[1].querySelector("input").value;
+
+        const newTime =
+            row.cells[2].querySelector("input").value;
+
+        taskObj.task = newTask;
+        taskObj.date = newDate;
+        taskObj.time = newTime;
+
+        row.cells[0].textContent = newTask;
+        row.cells[1].textContent = newDate;
+        row.cells[2].textContent = newTime;
+
+        taskObj.state = computeState(taskObj);
+        statusBtn.textContent = taskObj.state;
+
+        let tasks = getTasks();
+        const idx = tasks.findIndex(t => t.id === taskObj.id);
+
+        if (idx !== -1) {
+            tasks[idx] = taskObj;
+            saveTasks(tasks);
+        }
+
+        editBtn.textContent = "Edit";
+    };
+
+});
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "Remove";
+
+    removeBtn.addEventListener("click", () => {
+        let tasks = getTasks();
+        tasks = tasks.filter(t => t.id !== taskObj.id);
+        saveTasks(tasks);
+        row.remove();
+    });
+
+    actionCell.appendChild(editBtn);
+    actionCell.appendChild(removeBtn);
+}
+
+document.getElementById("add").addEventListener("click", () => {
+
+    if (Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+
+    const task = document.getElementById("task");
+    const date = document.getElementById("date");
+    const time = document.getElementById("time");
+
+    if (
+        task.value.trim() === "" ||
+        date.value === "" ||
+        time.value === ""
+    ) {
+        alert("Please fill all fields.");
+        return;
+    }
+
+    const taskObj = {
+        id: Date.now(),
+        task: task.value,
+        date: date.value,
+        time: time.value,
+        state: "Pending"
+    };
+
+    let tasks = getTasks();
+    tasks.push(taskObj);
+    saveTasks(tasks);
+
+    renderTask(taskObj);
+
+    task.value = "";
+    date.value = "";
+    time.value = "";
+});
+
+window.onload = () => {
+    getTasks().forEach(renderTask);
+};
+
+setInterval(() => {
+    const tasks = getTasks();
+    const now = new Date();
+
+    tasks.forEach(task => {
+        if (task.state === "Completed") return;
+
+        const due = new Date(`${task.date}T${task.time}`);
+        const diff = due - now;
+
+        if (
+        diff > 0 &&
+        diff <= 3600000 &&
+        Notification.permission === "granted"
+        ) {
+        new Notification("Task Reminder", {
+        body: `"${task.task}" is due within 1 hour`
+        });
+    }
+    });
+}, 500);
+</script>
+
+</body>
+</html>
