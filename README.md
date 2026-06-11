@@ -11,7 +11,7 @@ Bonus: Add simple UI + validation
 
 -Put all the files in a single folder  
 -Serve the folder using a local web server  
--A web server is required so that the application can run as a Progressive Web App (PWA) and properly support reminder functionality
+-A web server is required so that the application can run as a Progressive Web App (PWA) and properly support reminder functionality  
 -Open the webpage through localhost or loopback  
 
 This will open the project as a PWA in order to properly display the reminders
